@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Handwritten Digit Recognition</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+  </head>
+  <body>
+    <div class="page">
+      <header class="header">
+        <div class="title">
+          <h1 id="app-title">Handwritten Digit Recognition</h1>
+        </div>
+      </header>
+
+      <main class="workspace" aria-label="Workspace">
+        <div class="canvas-container">
+          <div class="draw-area">
+            <canvas id="draw" width="280" height="280" aria-label="Drawing canvas"></canvas>
+          </div>
+          <div class="prediction-area">
+            <div id="prediction" class="pred-value" role="status" aria-live="polite">—</div>
+          </div>
+        </div>
+        
+        <div class="controls-section">
+          <div class="btn-row" role="group" aria-label="Primary actions">
+            <button id="predictBtn" class="btn-accent" aria-label="Predict digit from drawing">Predict</button>
+            <button id="clearBtn" class="btn-danger" aria-label="Clear drawing">Clear</button>
+          </div>
+          <p class="tip">Draw a digit in the left box, then click Predict</p>
+        </div>
+      </main>
+    </div>
+
+    <script src="canvas.js"></script>
+    <script src="model.js"></script>
+    <script src="script.js"></script>
+  </body>
+</html>

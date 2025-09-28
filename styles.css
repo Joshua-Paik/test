@@ -1,0 +1,168 @@
+* { 
+  box-sizing: border-box; 
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+  background: #ffffff;
+  color: #333333;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px;
+  gap: 40px;
+}
+
+.header {
+  text-align: center;
+}
+
+.title h1 {
+  margin: 0 0 24px 0;
+  font-size: 32px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.btn-row { 
+  display: flex; 
+  gap: 16px; 
+  justify-content: center;
+}
+
+button {
+  appearance: none;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+  padding: 14px 28px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 16px;
+  transition: all 0.2s ease;
+  min-width: 120px;
+}
+
+button:hover { 
+  background: #f9fafb;
+  border-color: #9ca3af;
+}
+
+button:active { 
+  transform: translateY(1px); 
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+button:disabled:hover {
+  background: inherit;
+  border-color: inherit;
+}
+
+.btn-accent { 
+  background: #3b82f6; 
+  color: white; 
+  border-color: #3b82f6;
+}
+
+.btn-accent:hover { 
+  background: #2563eb; 
+  border-color: #2563eb;
+}
+
+.btn-danger { 
+  background: #ef4444; 
+  color: white; 
+  border-color: #ef4444;
+}
+
+.btn-danger:hover { 
+  background: #dc2626; 
+  border-color: #dc2626;
+}
+
+.workspace {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 32px;
+}
+
+.canvas-container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  align-items: center;
+  justify-items: center;
+}
+
+.draw-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f9fafb;
+  border: 2px dashed #d1d5db;
+  border-radius: 12px;
+  padding: 20px;
+  width: 320px;
+  height: 320px;
+}
+
+canvas#draw {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  touch-action: none;
+  display: block;
+}
+
+.prediction-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f3f4f6;
+  border: 2px solid #e5e7eb;
+  border-radius: 12px;
+  width: 320px;
+  height: 320px;
+}
+
+.controls-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.pred-value {
+  font-size: 180px;
+  font-weight: 800;
+  line-height: 1;
+  color: #111827;
+  text-align: center;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tip {
+  color: #6b7280;
+  font-size: 14px;
+  text-align: center;
+  margin: 0;
+}
