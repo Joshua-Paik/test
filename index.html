@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Single Digit Classifier</title>
+    <title>Handwritten Digit Recognition</title>
     <link rel="stylesheet" href="styles.css" />
     <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
   </head>
@@ -11,7 +11,7 @@
     <div class="page">
       <header class="header">
         <div class="title">
-          <h1 id="app-title">Single Digit Classifier</h1>
+          <h1 id="app-title">Handwritten Digit Recognition</h1>
         </div>
       </header>
 
@@ -23,6 +23,14 @@
           <div class="prediction-area">
             <div id="prediction" class="pred-value" role="status" aria-live="polite">—</div>
           </div>
+        </div>
+        
+        <div class="preview-section">
+          <h3 class="preview-title">Preprocessed Image (28×28)</h3>
+          <div class="preview-container">
+            <canvas id="preprocessPreview" width="140" height="140" aria-label="Preprocessed image preview"></canvas>
+          </div>
+          <p class="preview-description">This shows what the AI model sees after preprocessing</p>
         </div>
         
         <div class="controls-section">

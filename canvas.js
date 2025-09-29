@@ -22,6 +22,16 @@ class CanvasDrawing {
     this.offscreen.width = this.sampleSize;
     this.offscreen.height = this.sampleSize;
     this.offCtx = this.offscreen.getContext('2d');
+
+    // Temporary buffer for recentering adjustments
+    this.tempCanvas = document.createElement('canvas');
+    this.tempCanvas.width = this.sampleSize;
+    this.tempCanvas.height = this.sampleSize;
+    this.tempCtx = this.tempCanvas.getContext('2d');
+
+    // Preview widget for visualizing preprocessing output
+    this.previewCanvas = null;
+    this.previewCtx = null;
     
     // Drawing state
     this.isDrawing = false;
@@ -32,6 +42,7 @@ class CanvasDrawing {
     this.initCanvasBackground();
     this.setStroke();
     this.wirePointerEvents();
+    this.initPreviewWidget();
   }
   
   initCanvasBackground() {
@@ -95,6 +106,9 @@ class CanvasDrawing {
   
   clear() {
     this.initCanvasBackground();
+    if (this.previewCtx) {
+      this.renderPreview(true);
+    }
   }
   
   getImageData28x28() {
@@ -111,18 +125,155 @@ class CanvasDrawing {
     console.log(`DEBUG Canvas: Main canvas total pixels: ${this.drawCanvas.width * this.drawCanvas.height}`);
     console.log(`DEBUG Canvas: Main canvas average pixel value: ${mainPixelSum / (this.drawCanvas.width * this.drawCanvas.height)}`);
     
-    // Set background to white (same as main canvas)
+    const width = this.drawCanvas.width;
+    const height = this.drawCanvas.height;
+    const data = mainImageData.data;
+    let minX = width;
+    let minY = height;
+    let maxX = -1;
+    let maxY = -1;
+    let sumX = 0;
+    let sumY = 0;
+    let weightTotal = 0;
+
+    const darknessThreshold = 0.2; // Heuristic threshold for ink detection
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4;
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+        const a = data[idx + 3] / 255;
+        const grayscale = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        const darkness = (1 - grayscale) * a;
+
+        if (darkness > darknessThreshold) {
+          if (x < minX) minX = x;
+          if (y < minY) minY = y;
+          if (x > maxX) maxX = x;
+          if (y > maxY) maxY = y;
+          sumX += x * darkness;
+          sumY += y * darkness;
+          weightTotal += darkness;
+        }
+      }
+    }
+
+    const hasInk = maxX >= 0 && maxY >= 0;
+
     this.offCtx.fillStyle = '#ffffff';
     this.offCtx.fillRect(0, 0, this.sampleSize, this.sampleSize);
-    
-    // Enable smoothing for better downsampling
     this.offCtx.imageSmoothingEnabled = true;
     this.offCtx.imageSmoothingQuality = 'high';
-    
-    console.log(`DEBUG Canvas: About to draw main canvas (${this.drawCanvas.width}x${this.drawCanvas.height}) to offscreen (${this.sampleSize}x${this.sampleSize})`);
-    
-    // Draw the main canvas scaled down to 28x28
-    this.offCtx.drawImage(this.drawCanvas, 0, 0, this.sampleSize, this.sampleSize);
+
+    if (!hasInk) {
+      console.log('DEBUG Canvas: No ink detected, falling back to direct scale.');
+      this.offCtx.drawImage(this.drawCanvas, 0, 0, this.sampleSize, this.sampleSize);
+      this.offCtx.restore();
+      // Generate data URL of the 28x28 image
+      const url = this.offscreen.toDataURL('image/png');
+      console.log(`DEBUG Canvas: Data URL length: ${url.length}`);
+      return url;
+    }
+
+    const boundsWidth = maxX - minX + 1;
+    const boundsHeight = maxY - minY + 1;
+    const padding = Math.round(0.2 * Math.max(boundsWidth, boundsHeight));
+    const paddedMinX = Math.max(0, minX - padding);
+    const paddedMinY = Math.max(0, minY - padding);
+    const paddedMaxX = Math.min(width - 1, maxX + padding);
+    const paddedMaxY = Math.min(height - 1, maxY + padding);
+    const srcWidth = paddedMaxX - paddedMinX + 1;
+    const srcHeight = paddedMaxY - paddedMinY + 1;
+
+    const targetInnerSize = this.sampleSize - 8; // Keep a margin around the digit
+    const scale = targetInnerSize / Math.max(srcWidth, srcHeight);
+    const destWidth = srcWidth * scale;
+    const destHeight = srcHeight * scale;
+
+    const centerOfMassX = weightTotal > 0 ? sumX / weightTotal : (paddedMinX + paddedMaxX) / 2;
+    const centerOfMassY = weightTotal > 0 ? sumY / weightTotal : (paddedMinY + paddedMaxY) / 2;
+    const comRelativeX = (centerOfMassX - paddedMinX) * scale;
+    const comRelativeY = (centerOfMassY - paddedMinY) * scale;
+
+    const baseDx = (this.sampleSize - destWidth) / 2;
+    const baseDy = (this.sampleSize - destHeight) / 2;
+    let dx = baseDx + (this.sampleSize / 2 - (baseDx + comRelativeX));
+    let dy = baseDy + (this.sampleSize / 2 - (baseDy + comRelativeY));
+
+    const maxDx = this.sampleSize - destWidth;
+    const maxDy = this.sampleSize - destHeight;
+    dx = Math.min(Math.max(dx, 0), maxDx);
+    dy = Math.min(Math.max(dy, 0), maxDy);
+
+    console.log('DEBUG Canvas: Preprocessing bounds', {
+      minX: paddedMinX,
+      minY: paddedMinY,
+      maxX: paddedMaxX,
+      maxY: paddedMaxY,
+      destWidth,
+      destHeight,
+      dx,
+      dy,
+      centerOfMassX,
+      centerOfMassY
+    });
+
+    this.offCtx.drawImage(
+      this.drawCanvas,
+      paddedMinX,
+      paddedMinY,
+      srcWidth,
+      srcHeight,
+      dx,
+      dy,
+      destWidth,
+      destHeight
+    );
+
+    // Recompute center of mass on the 28x28 canvas and recentre if needed
+    const processedData = this.offCtx.getImageData(0, 0, this.sampleSize, this.sampleSize);
+    const processed = processedData.data;
+    let processedSumX = 0;
+    let processedSumY = 0;
+    let processedWeight = 0;
+
+    for (let y = 0; y < this.sampleSize; y++) {
+      for (let x = 0; x < this.sampleSize; x++) {
+        const idx = (y * this.sampleSize + x) * 4;
+        const r = processed[idx];
+        const g = processed[idx + 1];
+        const b = processed[idx + 2];
+        const a = processed[idx + 3] / 255;
+        const grayscale = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        const darkness = (1 - grayscale) * a;
+
+        if (darkness > darknessThreshold) {
+          processedSumX += x * darkness;
+          processedSumY += y * darkness;
+          processedWeight += darkness;
+        }
+      }
+    }
+
+    if (processedWeight > 0) {
+      const processedComX = processedSumX / processedWeight;
+      const processedComY = processedSumY / processedWeight;
+      const shiftX = Math.round(this.sampleSize / 2 - processedComX);
+      const shiftY = Math.round(this.sampleSize / 2 - processedComY);
+
+      if (shiftX !== 0 || shiftY !== 0) {
+        this.tempCtx.fillStyle = '#ffffff';
+        this.tempCtx.fillRect(0, 0, this.sampleSize, this.sampleSize);
+        this.tempCtx.drawImage(this.offscreen, 0, 0);
+
+        this.offCtx.fillStyle = '#ffffff';
+        this.offCtx.fillRect(0, 0, this.sampleSize, this.sampleSize);
+        this.offCtx.drawImage(this.tempCanvas, shiftX, shiftY);
+      }
+    }
+
     this.offCtx.restore();
     
     // DEBUG: Log canvas state
@@ -136,9 +287,8 @@ class CanvasDrawing {
     console.log(`DEBUG Canvas: 28x28 canvas average pixel value: ${pixelSum / (this.sampleSize * this.sampleSize)}`);
     console.log(`DEBUG Canvas: First 20 red pixels:`, Array.from(imageData.data).filter((_, idx) => idx % 4 === 0).slice(0, 20));
     
-    // Remove existing debug canvas if any
-    const existing = document.getElementById('debug-canvas-28x28');
-    if (existing) existing.remove();
+    // Update preview widget
+    this.renderPreview();
     
     // Generate data URL of the 28x28 image
     const url = this.offscreen.toDataURL('image/png');
@@ -154,5 +304,57 @@ class CanvasDrawing {
   // Get the 28x28 offscreen canvas
   get28x28Canvas() {
     return this.offscreen;
+  }
+
+  initPreviewWidget() {
+    // Try to get the preview canvas element
+    this.previewCanvas = document.getElementById('preprocessPreview');
+    console.log('DEBUG Preview: Canvas element found:', !!this.previewCanvas);
+    this.previewCtx = this.previewCanvas ? this.previewCanvas.getContext('2d') : null;
+    console.log('DEBUG Preview: Context obtained:', !!this.previewCtx);
+    
+    if (this.previewCtx) {
+      console.log('Preview widget initialized successfully');
+      console.log('DEBUG Preview: Canvas dimensions:', this.previewCanvas.width, 'x', this.previewCanvas.height);
+      this.renderPreview(true);
+    } else {
+      console.warn('Preview canvas not found - widget will not be available');
+    }
+  }
+
+  renderPreview(isClear = false) {
+    if (!this.previewCtx || !this.previewCanvas) {
+      console.log('DEBUG Preview: renderPreview called but no context available');
+      return;
+    }
+
+    console.log('DEBUG Preview: renderPreview called, isClear:', isClear);
+    this.previewCtx.save();
+    this.previewCtx.setTransform(1, 0, 0, 1, 0, 0);
+    this.previewCtx.clearRect(0, 0, this.previewCanvas.width, this.previewCanvas.height);
+
+    if (isClear) {
+      console.log('DEBUG Preview: Clearing preview with dark background');
+      this.previewCtx.fillStyle = '#111827';
+      this.previewCtx.fillRect(0, 0, this.previewCanvas.width, this.previewCanvas.height);
+      this.previewCtx.restore();
+      return;
+    }
+
+    // Fill with dark background to match MNIST style
+    this.previewCtx.fillStyle = '#111827';
+    this.previewCtx.fillRect(0, 0, this.previewCanvas.width, this.previewCanvas.height);
+
+    // Disable smoothing for pixelated look
+    this.previewCtx.imageSmoothingEnabled = false;
+    
+    console.log('DEBUG Preview: Drawing offscreen canvas to preview');
+    console.log('DEBUG Preview: Offscreen canvas dimensions:', this.offscreen.width, 'x', this.offscreen.height);
+    
+    // Draw the 28x28 processed image scaled up to fit the preview canvas
+    this.previewCtx.drawImage(this.offscreen, 0, 0, this.previewCanvas.width, this.previewCanvas.height);
+
+    this.previewCtx.restore();
+    console.log('DEBUG Preview: renderPreview completed');
   }
 }
