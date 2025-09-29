@@ -8,6 +8,9 @@ class MNISTModel {
   }
 
   async loadModel(modelPath = 'tfjs_model/model.json') {
+    const cacheBuster = Date.now();
+    const modelPathWithCache = `${modelPath}?v=${cacheBuster}`;
+    console.log('[Model Load] Using path:', modelPathWithCache);
     if (this.isLoaded) {
       return this.model;
     }
@@ -24,9 +27,21 @@ class MNISTModel {
       this.isLoading = true;
       this.loadError = null;
       
-      console.log('Loading TensorFlow.js model from:', modelPath);
+      console.log('Loading TensorFlow.js model from:', modelPathWithCache);
       console.log('TensorFlow.js version:', tf.version);
-      this.model = await tf.loadLayersModel(modelPath);
+      console.log('TensorFlow.js backend:', tf.getBackend());
+
+      // Fetch model JSON for inspection
+      const response = await fetch(modelPathWithCache, { cache: 'no-store' });
+      if (!response.ok) {
+        throw new Error(`Failed to fetch model.json (${response.status} ${response.statusText})`);
+      }
+      const modelJson = await response.json();
+      console.log('[Model Load] Model format:', modelJson.format);
+      const inputLayer = modelJson?.modelTopology?.model_config?.config?.layers?.find(layer => layer.class_name === 'InputLayer');
+      console.log('[Model Load] InputLayer config:', inputLayer?.config);
+
+      this.model = await tf.loadLayersModel(modelPathWithCache);
       console.log('Model loaded successfully!');
       console.log('Model input shape:', this.model.inputs[0].shape);
       console.log('Model output shape:', this.model.outputs[0].shape);
@@ -38,6 +53,7 @@ class MNISTModel {
       console.error('Failed to load model:', error);
       console.error('Error details:', error.message);
       console.error('Error stack:', error.stack);
+      console.error('Model load path:', modelPathWithCache);
       this.loadError = error;
       throw error;
     } finally {
